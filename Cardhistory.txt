@@ -1,0 +1,111 @@
+/* Formatted on 2012/01/26 11:38 (Formatter Plus v4.8.6) */
+SELECT   p.code_level project_level, p.code_desc project_name, pt.trans_date,
+         duc.code_level dept_level,
+         'PD :' || TO_CHAR (ei.promo_date, 'DD/MM/RR') promo_date,
+         'Old ID # ' || ei.old_uid_no old_uid_no, puc.code_level desig_level,
+         ei.joining_date, duc.code_desc dept_name, ei.cid_no,
+         ei.uid_no emp_code, emp_name, puc.code_desc designation,
+         (case when  to_char(trans_date,'dy')='fri' then null else pt.fac_in_time  end)in_time ,          
+         (case when  to_char(trans_date,'dy')='fri' then null
+         when to_char(out_time,'dd/mm/rr hh:mi') >to_char(trans_date, 'dd/mm/rr')||' 10:15' and pt.att_status <> 7  then' 10:09'||':PM'
+ when pt.att_status in (7,8) then null else to_char(out_time,'hh:mi PM') end) out_time,   
+         DECODE (ei.ot_type, 'Y', (nvl(pt.fac_ot_min,0)+nvl(FAC_OT_MIN2,0))/ 60, 0) ot_min,
+          case when pt.ATT_STATUS_FAC in (7) and pt.ATT_STATUS in (1) then 0  else 
+         DECODE(att_status,1, (CASE WHEN late_min > 0 THEN 1 ELSE 0 END),0) end late_cnt,
+         DECODE (att_status,
+                 1, 1,
+                 7, 1,
+                 8, 1,
+                 0
+                ) present_cnt,
+         DECODE (att_status,
+                 0, 1,
+                 5, 1,
+                 6, 1,
+                 1, 0,
+                 0
+                ) absent_cnt,
+         (case when pt.att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type IN( 'CL','EL','ML','LWP','SL'))then 1 else 0 end ) leave_cnt,
+  case when pt.ATT_STATUS_FAC in (7) and pt.ATT_STATUS in (1) then '00:00' else 
+           TO_CHAR (FLOOR (pt.late_min / 60), '00')
+         || ':'
+         || TO_CHAR (FLOOR (MOD (pt.late_min, 60)), '00')end  late,
+            TO_CHAR (FLOOR (pt.early_min / 60), '00')
+         || ':'
+         || TO_CHAR (FLOOR (MOD (pt.early_min, 60)), '00') early,
+         DECODE (ei.ot_type,
+                 'Y', TO_CHAR (FLOOR (pt.fac_ot_min / 60) + FLOOR (pt.fac_ot_min2 / 60), '00')
+                  || ':'
+                  || TO_CHAR (FLOOR (MOD (pt.fac_ot_min, 60))+FLOOR (MOD (pt.FAC_OT_MIN2, 60)), '00'),
+                 ' '
+                ) over_time,
+         (CASE
+                WHEN att_status  IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'CL')
+                   THEN 'Casual Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'SL')
+                   THEN 'Sick Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'EL')
+                   THEN 'Earn Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'ML')
+                   THEN 'Maternity Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'LWP')
+                   THEN 'Leave Without Pay'
+                WHEN att_status IN (0) and pt.fac_status is null
+                   THEN 'Absent'
+                WHEN att_status IN (1) 
+                   THEN    pt.remarks
+                WHEN att_status IN (1) AND pt.fac_in_time is not null
+                   THEN    pt.remarks
+                        || DECODE (NVL (late_min, 0), 0, NULL, ' Late')
+                WHEN att_status IN (7)
+                   THEN 'Weekend'
+                WHEN att_status IN (8)
+                   THEN (SELECT g.description
+                           FROM pr_public_holi_day g
+                          WHERE g.holi_date = trans_date AND g.project_code = ei.project_code
+                         --   AND g.project_code = :p_project_code
+)
+                ELSE NULL
+             END
+            )
+         ---|| DECODE (NVL (holiday_work, 0), 0, '', ' & Present')
+         || DECODE (TO_CHAR (in_time, 'DDMMRRRRHH24MISS'),
+                    NULL, NULL,
+                    TO_CHAR (out_time, 'DDMMRRRRHH24MISS'), ' Error Data',
+                    NULL
+                   )||pt.fac_status status,
+       f.code_level floor_level, f.code_desc floor_name,
+         pt.ATT_STATUS,ATT_STATUS_FAC
+    FROM emp_info ei,
+         g_uni_codes duc,
+         g_uni_codes puc,
+         pr_day_wise_attendence pt,
+         g_uni_codes f,
+         g_uni_codes p
+   WHERE ei.sec_code = duc.code
+     AND ei.desig_code = puc.code
+     AND ei.project_code = p.code
+     AND ei.cid_no = pt.cid_no
+     and ei.project_code=p.code
+    -- and pt.cid_no=nvl(:p_cid_no,pt.cid_no)
+     AND ei.floor_code = f.code(+)
+     AND ei.uid_no = NVL (:p_uid_no, ei.uid_no)
+     AND ei.project_code = NVL (:p_project_code, ei.project_code)
+     AND nvl(ei.sec_code,0) = NVL (:p_sec_code, nvl(ei.sec_code,0))
+     AND nvl(ei.desig_code,0) = NVL (:p_desig_code, nvl(ei.desig_code,0))
+     AND NVL(ei.line_code,0) = NVL (:p_line_code, NVL(ei.line_code,0))
+     AND NVL(ei.floor_code,0) = NVL (:p_floor_code, NVL(ei.floor_code,0))
+     AND pt.trans_date BETWEEN :p_fdate AND :p_tdate
+ORDER BY pt.trans_date ASC, ei.uid_no

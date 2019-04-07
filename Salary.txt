@@ -1,0 +1,36 @@
+SELECT   v.uid_no, SUBSTR (v.uid_no, 1, 4) left_sl,
+         SUBSTR (v.uid_no, 5) right_sl, ' ' || v.emp_name emp_name,floor_name,
+         ' ' || v.desig_name desig_name, v.salary_date, v.project_code,
+         v.project_name, v.sec_name, salary_grade salary_grade, v.working_day,
+         v.present present1, v.absent, v.salary_day, no_work_day, v.rate_base,
+         desig_sl, v.joining_date, V.BANK_BASIC , V.BANK_HOUSERENT , V.BANK_MEDICAL ,
+         V.BANK_SAL , v.min_pay, v.prod_wages, v.prod_bonus,
+         v.prod_att_bonus, v.no_work_basis, V.BANK_ACCOUNT_NO,
+        OTHER_AMT_PLUS,
+         v.Bank_absent_amount deduct_absent_amopunt,  v.stamp , 
+          v.Bank_TOTAL_DEDUCT total_deduct,
+          nvl(v.bank_gross_pay,0) gross_pay,
+          nvl(V.BANK_CONV ,0)CON_ALLOW_N,
+          nvl(V.BANK_FOOD ,0)Food_allow,
+         RUNING_ABSENT, runingABSENT_AMOUNT,
+         v.ot_amount, v.incentive_amount, 
+         round (nvl(v.bank_NET_PAY,0)+nvl( v.prod_att_bonus,0)+ nvl( v.ot_amount,0))net_pay,
+          v.ot_hr, v.ot_rate,
+         v.TAX_SAL,
+         leave_cl, leave_el, leave_ml, block_level, block_name,WH_DAYS,FH_DAYS, 
+ nvl(v.ot_hr,0) bal_ot,v.Advance_amt,v.DINING_BILL,v.OTHER_AMT_MINUS, v.LOAN_PAYMENT_AMT,nvl(v.Advance_amt,0)+nvl(v.LOAN_PAYMENT_AMT,0) loan_pay_adv,
+nvl(v.present, 0) - nvl(WH_DAYS,0) - nvl( FH_DAYS,    0) present_net_in_day,
+nvl(v.working_day, 0)  - nvl(leave_cl,0) - nvl( FH_DAYS, 0)-nvl(leave_el,0) - nvl( leave_ml, 0) - nvl(WH_DAYS,0)- nvl(absent,0) present,
+(nvl(v.present, 0)  - nvl(WH_DAYS,0) - nvl( FH_DAYS,    0) )*8  present_net_in_hour        
+    FROM V_MANUAL_SALARY v
+   WHERE v.project_code = NVL (:p_project_id, v.project_code)
+     AND v.salary_date BETWEEN :p_fdate AND :p_tdate
+     AND v.sec_code = NVL (:p_sec_code, v.sec_code)
+     AND v.floor_code = NVL(:p_floor_code, v.floor_code)
+     AND V.DEPT_CODE= NVL(:P_DEPT_CODE, V.DEPT_CODE)
+    AND V.JOINING_DATE  BETWEEN :p_fdate AND :p_tdate
+    AND V.EMP_OUT_DATE is null
+   AND V.PAY_TYPE='Bank'
+   And V.EMP_TYPE='Factory'
+     
+ORDER BY left_sl ASC, right_sl ASC, v.uid_no ASC

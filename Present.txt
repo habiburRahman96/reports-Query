@@ -1,0 +1,97 @@
+/* Formatted on 2012/02/02 16:48 (Formatter Plus v4.8.6) */
+SELECT   pp.code_level project_leve, pp.code_desc project_name, PP.OTHER_DESC project_address, pt.trans_date,
+         duc.code_level sec_level, puc.code_level desig_level,
+         (select code_desc from g_uni_codes g where g.code= ei.FLOOR_CODE) floor_name,
+         (select code_desc from g_uni_codes g where g.code= ei.office_time_code) Shift,
+         R_STATUS,dept.code_level dept_level,
+         duc.code_desc sec_name, dept.code_desc dept,ei.cid_no, '  ' || ei.uid_no emp_code,
+         '  ' || emp_name emp_name, '  ' || puc.code_desc designation,
+         in_time, pt.out_time,
+            TO_CHAR (ROUND (TRUNC ((pt.late_min / 60), 0), '00'))
+         || ':'
+         || TO_CHAR (ROUND (MOD (pt.late_min, 60)), '00') late,
+            TO_CHAR (ROUND (TRUNC ((pt.early_min / 60), 0), '00'))
+         || ':'
+         || TO_CHAR (ROUND (MOD (pt.early_min, 60)), '00') early,
+         DECODE (ei.ot_type,
+                 'Y', TO_CHAR (ROUND (TRUNC ((pt.over_time_min / 60), 0),
+                                      '00'
+                                     )
+                              )
+                  || ':'
+                  || TO_CHAR (ROUND (MOD (pt.over_time_min, 60)), '00'),
+                 ''
+                ) over_time,
+            (CASE
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'CL')
+                   THEN 'Casual Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'SL')
+                   THEN 'Sick Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'EL')
+                   THEN 'Earn Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'ML')
+                   THEN 'Maternity Leave'
+                WHEN att_status IN (SELECT leave_type_id
+                                      FROM leave_type_info
+                                     WHERE leave_type = 'LWP')
+                   THEN 'Leave Without Pay'
+                WHEN att_status IN (0)
+                   THEN 'Absent'
+                WHEN att_status IN (1)
+                   THEN    pt.remarks
+                        || DECODE (NVL (late_min, 0), 0, NULL, ' Late')
+                WHEN att_status IN (7)
+                   THEN 'Weekend'
+                WHEN att_status IN (8)
+                   THEN (SELECT g.description
+                           FROM pr_public_holi_day g
+                          WHERE g.holi_date = trans_date
+                            AND g.project_code = :p_project_code)
+                ELSE NULL
+             END
+            )
+         || DECODE (NVL (holiday_work, 0), 0, '', ' & Present')
+         || DECODE (TO_CHAR (in_time, 'DDMMRRRRHH24MISS'),
+                    NULL, NULL,
+                    TO_CHAR (out_time, 'DDMMRRRRHH24MISS'), ' Error Data',
+                    NULL
+                   ) status
+    FROM emp_info ei,
+         g_uni_codes duc,
+         g_uni_codes dept,
+         g_uni_codes puc,
+         pr_day_wise_attendence pt,
+         g_uni_codes pp
+   WHERE ei.sec_code = duc.code
+     AND ei.project_code = pp.code
+     AND EI.DEPT_CODE= dept.code
+     AND ei.desig_code = puc.code
+     AND ei.cid_no = pt.cid_no
+     AND NVL (ei.emp_out, 'N') <> 'Y'
+     AND pt.att_status = 1
+     AND  NVL(R_Status,'X')  Like '%'||:p_slot||'%'
+     AND ei.project_code = NVL (:p_project_code, ei.project_code)
+     AND NVL (ei.dept_code, 0) = NVL (:p_dept_code, NVL (ei.dept_code, 0))
+     AND NVL (ei.sec_code, 0) = NVL (:p_sec_code, NVL (ei.sec_code, 0))
+     AND NVL (ei.desig_code, 0) = NVL (:p_desig_code, NVL (ei.desig_code, 0))
+     AND NVL (ei.line_code, 0) = NVL (:p_line_code, NVL (ei.line_code, 0))
+     AND NVL (ei.FLOOR_CODE, 0) = NVL (:p_FLOOR_CODE, NVL (ei.FLOOR_CODE, 0))
+     AND pt.trans_date BETWEEN :p_fdate AND :p_tdate
+   AND pt.trans_date <= NVL (ei.emp_out_date, :p_tdate)
+     AND pt.trans_date >= ei.joining_date
+ORDER BY pp.code_level ASC,
+         pp.code_desc DESC,
+         dept.code_level,
+         duc.code_level,
+         floor_name asc,
+         pt.trans_date ASC,
+         ei.uid_no ASC
+      -- puc.code_level
